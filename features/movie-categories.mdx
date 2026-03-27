@@ -1,0 +1,180 @@
+---
+title: "Movie Categories"
+description: "The five movie categories available in Cinemapedia, how they map to TheMovieDB API endpoints, and how infinite pagination works."
+---
+
+Cinemapedia displays movies in five distinct categories, each backed by a dedicated Riverpod provider and a separate TheMovieDB API endpoint. All categories share the same `MoviesNotifier` class and support infinite scroll pagination.
+
+## Categories overview
+
+<CardGroup cols={2}>
+  <Card title="En cines" icon="film">
+    Movies currently playing in theaters. Uses the `/movie/now_playing` endpoint. Provider: `nowPlayingMoviesProvider`.
+  </Card>
+  <Card title="Próximamente" icon="calendar">
+    Upcoming releases. Uses the `/movie/upcoming` endpoint. Provider: `upcomingMoviesProvider`.
+  </Card>
+  <Card title="Populares" icon="fire">
+    Most popular movies right now. Uses the `/movie/popular` endpoint. Provider: `popularMoviesProvider`.
+  </Card>
+  <Card title="Mejor valoradas" icon="star">
+    Highest rated movies of all time. Uses the `/movie/top_rated` endpoint. Provider: `topratedMoviesProvider`.
+  </Card>
+  <Card title="Cine Mexicano" icon="flag">
+    Mexican cinema, sorted by rating. Uses the `/discover/movie` endpoint with `region=MX` and `with_origin_country=MX`. Provider: `mexicanMoviesProvider`.
+  </Card>
+</CardGroup>
+
+## Category reference table
+
+| Display name | Provider | TheMovieDB endpoint | Notes |
+|---|---|---|---|
+| En cines | `nowPlayingMoviesProvider` | `GET /movie/now_playing` | Also drives the `MovieSlideshow` (first 6 results) |
+| Próximamente | `upcomingMoviesProvider` | `GET /movie/upcoming` | — |
+| Populares | `popularMoviesProvider` | `GET /movie/popular` | — |
+| Mejor valoradas | `topratedMoviesProvider` | `GET /movie/top_rated` | — |
+| Cine Mexicano | `mexicanMoviesProvider` | `GET /discover/movie` | Filtered by `region=MX`, `with_origin_country=MX`, sorted by `vote_average.desc`, minimum 10 votes |
+
+## API datasource
+
+All HTTP requests are made by `MoviedbDataSource` using the `dio` package. The base URL is `https://api.themoviedb.org/3` with `language=es-MX` applied globally.
+
+### Standard categories
+
+For Now Playing, Popular, Upcoming, and Top Rated, the pattern is identical — only the path differs:
+
+```dart
+@override
+Future<List<Movie>> getNowPlaying({int page = 1}) async {
+  final response = await dio.get(
+    '/movie/now_playing',
+    queryParameters: {'page': page},
+  );
+
+  final movieDBResponse = MovieDbResponse.fromJson(response.data);
+
+  final List<Movie> movies = movieDBResponse.results
+      .where((moviedb) => moviedb.posterPath != 'no-poster')
+      .map((moviedb) => MovieMapper.movieDBToEntity(moviedb))
+      .toList();
+
+  return movies;
+}
+```
+
+<Note>
+Movies without a poster image are filtered out before the list is returned. This prevents broken image widgets in the UI.
+</Note>
+
+### Mexican Cinema
+
+The `getMexicanMovies` method uses the `/discover/movie` endpoint with additional query parameters:
+
+```dart
+@override
+Future<List<Movie>> getMexicanMovies({int page = 1}) async {
+  final response = await dio.get(
+    '/discover/movie',
+    queryParameters: {
+      'page': page,
+      'region': 'MX',
+      'withOriginalLanguaje': 'es',
+      'with_origin_country': 'MX',
+      'sort_by': 'vote_average.desc',
+      'vote_count.gte': 10,
+    },
+  );
+  // ...
+}
+```
+
+## Providers
+
+Each category has its own `NotifierProvider<MoviesNotifier, List<Movie>>`. All five providers are defined in `movies_providers.dart` and follow the same pattern:
+
+```dart
+final nowPlayingMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getNowPlaying,
+  ),
+);
+
+final popularMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getPopular,
+  ),
+);
+
+final upcomingMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getUpcoming,
+  ),
+);
+
+final topratedMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getTopRated,
+  ),
+);
+
+final mexicanMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getMexicanMovies,
+  ),
+);
+```
+
+Each provider receives a builder function that returns the appropriate repository method. This makes `MoviesNotifier` reusable across all five categories.
+
+## Infinite pagination
+
+Pagination is handled entirely by `MoviesNotifier`. Calling `loadNextPage()` increments an internal page counter and appends the new results to the existing state list.
+
+```dart
+class MoviesNotifier extends Notifier<List<Movie>> {
+  int currentPage = 0;
+  bool isLoading = false;
+
+  Future<void> loadNextPage() async {
+    if (isLoading) return;
+    isLoading = true;
+
+    currentPage++;
+    final movies = await fetchMoreMovies(page: currentPage);
+
+    state = [...state, ...movies];
+
+    isLoading = false;
+  }
+}
+```
+
+<Tip>
+The `isLoading` guard prevents duplicate requests if `loadNextPage()` is called again before the previous one completes — for example, when the user rapidly scrolls to the end of a list.
+</Tip>
+
+### Scroll-triggered loading
+
+`MovieHorizontalListview` attaches a `ScrollController` listener that calls `loadNextPage()` when the scroll position is within 200 pixels of the end of the list:
+
+```dart
+scrollController.addListener(() {
+  if (widget.loadNextPage == null) return;
+  if (scrollController.position.pixels + 200 >=
+      scrollController.position.maxScrollExtent) {
+    widget.loadNextPage!();
+  }
+});
+```
+
+This callback is wired up in `HomeScreen` for each category:
+
+```dart
+MovieHorizontalListview(
+  movies: nowPlayingMovies,
+  title: 'En cines',
+  subTitle: 'Lunes 27 de Octubre',
+  loadNextPage: () =>
+      ref.read(nowPlayingMoviesProvider.notifier).loadNextPage(),
+),
+```

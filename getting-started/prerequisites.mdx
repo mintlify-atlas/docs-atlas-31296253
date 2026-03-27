@@ -1,0 +1,79 @@
+---
+title: "Prerequisites"
+description: "Everything you need before setting up Cinemapedia on your machine."
+---
+
+Before you install and run Cinemapedia, make sure you have the following tools and accounts ready.
+
+## Required tools
+
+| Tool | Version |
+|------|---------|
+| Flutter SDK | `^3.9.2` (Dart SDK `^3.9.2`) |
+| Dart SDK | Included with Flutter |
+| Git | Any recent version |
+
+## Required accounts
+
+- A [TheMovieDB](https://www.themoviedb.org/) account with an active API key.
+
+---
+
+## Set up Flutter
+
+<Steps>
+  <Step title="Install Flutter">
+    Download and install the Flutter SDK from the official Flutter website.
+
+    ```bash
+    # Verify the Flutter binary is on your PATH
+    flutter --version
+    ```
+
+    <Tip>
+      Flutter includes the Dart SDK, so you do not need to install Dart separately.
+    </Tip>
+  </Step>
+
+  <Step title="Run Flutter Doctor">
+    Run the following command to check your environment and confirm that everything is configured correctly:
+
+    ```bash
+    flutter doctor
+    ```
+
+    Review the output and resolve any issues marked with an `✗` before continuing.
+
+    <Note>
+      For a mobile device target you will also need either Android Studio (for Android) or Xcode (for iOS). Make sure the relevant entries in `flutter doctor` show no errors.
+    </Note>
+  </Step>
+</Steps>
+
+---
+
+## Get a TheMovieDB API key
+
+<Steps>
+  <Step title="Create a TheMovieDB account">
+    Go to [https://www.themoviedb.org/signup](https://www.themoviedb.org/signup) and register for a free account.
+  </Step>
+
+  <Step title="Navigate to API settings">
+    Once logged in:
+
+    1. Click your avatar in the top-right corner and select **Settings**.
+    2. In the left sidebar, click **API**.
+    3. Under **API Key (v3 auth)**, click **Create** and follow the prompts.
+
+    After completing the form, your API key will appear on the same page.
+  </Step>
+
+  <Step title="Copy your API key">
+    Copy the **API Key (v3 auth)** value. You will need it when configuring the `.env` file during installation.
+
+    <Warning>
+      Keep your API key private. Do not commit it to version control or share it publicly.
+    </Warning>
+  </Step>
+</Steps>

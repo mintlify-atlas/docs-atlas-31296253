@@ -1,0 +1,93 @@
+---
+title: "MovieHorizontalListview"
+description: "A horizontally scrolling list of movie poster cards with optional title, subtitle, and infinite-scroll support."
+---
+
+`MovieHorizontalListview` is a `StatefulWidget` that renders a row of movie poster cards in a horizontal `ListView`. It is the primary list component on the home screen and appears once for each movie category (now playing, upcoming, popular, top-rated, and Mexican cinema).
+
+The widget is rendered at a fixed height of **360 px**. Each card is **150 × 215 px** and shows the movie poster, title, star rating, and popularity score. Tapping a poster navigates to `/movie/<id>` via GoRouter. Poster images fade in using the `animate_do` package.
+
+## Constructor
+
+```dart
+const MovieHorizontalListview({
+  super.key,
+  required this.movies,
+  this.title,
+  this.subTitle,
+  this.loadNextPage,
+});
+```
+
+## Parameters
+
+<ParamField path="movies" type="List<Movie>" required>
+  The list of `Movie` entities to display. Each item is rendered as a poster card with title, rating, and popularity.
+</ParamField>
+
+<ParamField path="title" type="String?">
+  Optional heading displayed in the top-left of the list header row. When both `title` and `subTitle` are `null`, the header row is omitted entirely.
+</ParamField>
+
+<ParamField path="subTitle" type="String?">
+  Optional secondary label displayed as a filled tonal button in the top-right of the header row. Typically used for a date or time range (e.g. `"Lunes 27 de Octubre"`).
+</ParamField>
+
+<ParamField path="loadNextPage" type="VoidCallback?">
+  Optional callback invoked when the user scrolls within 200 px of the end of the list. Use this to implement infinite pagination. When `null`, no additional pages are loaded.
+</ParamField>
+
+## Infinite scroll behavior
+
+The widget attaches a `ScrollController` in `initState`. On every scroll event it checks:
+
+```dart
+if (scrollController.position.pixels + 200 >=
+    scrollController.position.maxScrollExtent) {
+  widget.loadNextPage!();
+}
+```
+
+This triggers `loadNextPage` before the user actually reaches the end of the list, producing a seamless loading experience. The controller is disposed in `dispose` to avoid memory leaks.
+
+<Warning>
+  `loadNextPage` may be called multiple times in rapid succession as the user scrolls. Ensure the backing provider guards against duplicate in-flight requests (e.g. by checking an `isLoading` flag before fetching).
+</Warning>
+
+## Usage examples
+
+The home screen renders five independent instances of this widget, each backed by its own Riverpod provider:
+
+```dart
+// Now playing — with date subtitle and infinite scroll
+MovieHorizontalListview(
+  movies: nowPlayingMovies,
+  title: 'En cines',
+  subTitle: 'Lunes 27 de Octubre',
+  loadNextPage: () =>
+      ref.read(nowPlayingMoviesProvider.notifier).loadNextPage(),
+);
+
+// Upcoming releases
+MovieHorizontalListview(
+  movies: upcomingMovies,
+  title: 'Próximamente',
+  subTitle: 'Noviembre',
+  loadNextPage: () =>
+      ref.read(upcomingMoviesProvider.notifier).loadNextPage(),
+);
+
+// List without infinite scroll (static dataset)
+MovieHorizontalListview(
+  movies: myStaticList,
+  title: 'My picks',
+);
+```
+
+<Tip>
+  Omit both `title` and `subTitle` to render a header-free list. This is useful when the surrounding layout already provides its own section label.
+</Tip>
+
+## Source location
+
+`lib/presentation/widgets/movies/movie_horizontal_listview.dart`

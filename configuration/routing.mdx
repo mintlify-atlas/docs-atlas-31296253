@@ -1,0 +1,118 @@
+---
+title: "Routing Configuration"
+description: "Declare and navigate app screens using GoRouter with named routes and path parameters."
+---
+
+Cinemapedia uses [GoRouter](https://pub.dev/packages/go_router) for declarative, URL-based navigation. All routes are defined in a single `appRouter` instance and wired into `MaterialApp.router`.
+
+## Router setup
+
+```dart lib/config/router/app_router.dart
+import 'package:cinemapedia_220083/presentation/screens/screens.dart';
+import 'package:go_router/go_router.dart';
+
+final appRouter = GoRouter(
+  initialLocation: '/',
+
+  routes: [
+    GoRoute(
+      path: '/',
+      name: HomeScreen.name,
+      builder: (context, state) => const HomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'movie/:id',
+          name: MovieScreen.name,
+          builder: (context, state) {
+            final movieId = state.pathParameters['id'] ?? 'no-id';
+            return MovieScreen(movieId: movieId);
+          },
+        ),
+      ],
+    ),
+  ],
+);
+```
+
+### initialLocation
+
+The router opens on `/` (the home screen) when the app launches. Change `initialLocation` to send users to a different screen on first load.
+
+## Configured routes
+
+| Path | Name | Screen | Description |
+|---|---|---|---|
+| `/` | `HomeScreen.name` | `HomeScreen` | Landing screen — lists movies currently in theatres |
+| `/movie/:id` | `MovieScreen.name` | `MovieScreen` | Detail view for a single movie identified by `:id` |
+
+## Nested routes
+
+The movie detail route is declared as a **child** of the home route, not as a top-level entry:
+
+```dart
+GoRoute(
+  path: '/',            // parent
+  ...
+  routes: [
+    GoRoute(
+      path: 'movie/:id', // child — full URL is /movie/:id
+      ...
+    ),
+  ],
+),
+```
+
+Nesting routes under a parent lets GoRouter compose the full URL path automatically. The resulting URLs are:
+
+- `/` — home
+- `/movie/550` — detail page for movie with id `550`
+
+<Note>
+Child paths do **not** start with a leading `/`. GoRouter joins the parent path and the child path for you, so `'/'` + `'movie/:id'` becomes `/movie/:id`.
+</Note>
+
+## Path parameters
+
+The `:id` segment is a dynamic path parameter. GoRouter extracts it from the URL and makes it available via `state.pathParameters`:
+
+```dart
+builder: (context, state) {
+  final movieId = state.pathParameters['id'] ?? 'no-id';
+  return MovieScreen(movieId: movieId);
+},
+```
+
+If the parameter is absent for any reason, `movieId` falls back to `'no-id'` so the build never receives a `null` value.
+
+## Navigating between screens
+
+Use the named-route helpers anywhere in the widget tree:
+
+```dart
+// Navigate to the movie detail screen
+context.pushNamed(
+  MovieScreen.name,
+  pathParameters: {'id': movie.id.toString()},
+);
+
+// Navigate back to home
+context.goNamed(HomeScreen.name);
+```
+
+<Tip>
+Prefer `pushNamed` / `goNamed` over string-based navigation. If a route name or path changes you only need to update the `GoRoute` declaration — all call sites that reference the `name` constant stay correct automatically.
+</Tip>
+
+## Wiring the router to the app
+
+The `appRouter` instance is passed to `MaterialApp.router` in `main.dart`:
+
+```dart lib/main.dart
+return MaterialApp.router(
+  routerConfig: appRouter,
+  debugShowCheckedModeBanner: false,
+  theme: AppTheme().getTheme(),
+);
+```
+
+Using `MaterialApp.router` instead of `MaterialApp` hands full navigation control to GoRouter, enabling deep linking and URL-driven navigation on web and mobile alike.

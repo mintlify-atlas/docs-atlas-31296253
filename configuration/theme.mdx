@@ -1,0 +1,91 @@
+---
+title: "Theme Configuration"
+description: "Configure the app-wide visual theme using the AppTheme class built on Flutter's Material 3 design system."
+---
+
+Cinemapedia uses a single `AppTheme` class to define its visual style. The theme is created with Flutter's Material 3 design system and a custom seed color that drives the entire color scheme.
+
+## AppTheme class
+
+```dart lib/config/theme/app_theme.dart
+import 'package:flutter/material.dart';
+
+class AppTheme {
+  ThemeData getTheme() =>
+      ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF2862F5));
+}
+```
+
+### getTheme()
+
+`getTheme()` returns a `ThemeData` instance configured with two key options:
+
+| Option | Value | Effect |
+|---|---|---|
+| `useMaterial3` | `true` | Opts in to Material 3 components, typography, and motion |
+| `colorSchemeSeed` | `Color(0xFF2862F5)` | Generates the full color scheme from this single blue seed color |
+
+## How the theme is applied
+
+The `AppTheme` instance is created in `MainApp.build()` and passed directly to `MaterialApp.router`:
+
+```dart lib/main.dart
+return MaterialApp.router(
+  routerConfig: appRouter,
+  debugShowCheckedModeBanner: false,
+  theme: AppTheme().getTheme(),
+);
+```
+
+Because a new `AppTheme()` is instantiated on every build, the theme is stateless — there is no mutable theme state to manage.
+
+## Seed color
+
+Material 3 derives an entire harmonious color scheme (primary, secondary, tertiary, surface, error, and their variants) from a single `colorSchemeSeed`. The current seed is:
+
+```dart
+const Color(0xFF2862F5) // a vivid blue
+```
+
+Flutter generates all tonal palette roles automatically from this value, so changing the seed updates every color in the app consistently.
+
+## Customizing the color scheme
+
+To change the app's color palette, replace the hex value passed to `colorSchemeSeed`:
+
+```dart lib/config/theme/app_theme.dart
+class AppTheme {
+  ThemeData getTheme() =>
+      ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: const Color(0xFFE53935), // red seed
+      );
+}
+```
+
+<Tip>
+You can preview the generated color scheme before committing to a seed color using the [Material Theme Builder](https://m3.material.io/theme-builder). Enter your hex value and inspect all generated roles interactively.
+</Tip>
+
+## Extending the theme
+
+Add further customisation by passing additional properties to `ThemeData`:
+
+```dart
+ThemeData(
+  useMaterial3: true,
+  colorSchemeSeed: const Color(0xFF2862F5),
+  // override specific text styles
+  textTheme: const TextTheme(
+    titleLarge: TextStyle(fontWeight: FontWeight.bold),
+  ),
+  // override the app bar theme globally
+  appBarTheme: const AppBarTheme(
+    centerTitle: true,
+  ),
+)
+```
+
+<Note>
+The `AppTheme` class currently exposes no constructor parameters. If you need runtime theme switching (e.g. dark mode toggle), add fields to `AppTheme`, pass them via the constructor, and manage the selected `AppTheme` instance with a Riverpod provider.
+</Note>

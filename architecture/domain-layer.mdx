@@ -1,0 +1,119 @@
+---
+title: "Domain layer"
+description: "The domain layer defines the core business rules of Cinemapedia through entities, abstract datasources, and repository contracts."
+---
+
+The domain layer is the innermost ring of the architecture. It contains no framework imports and no knowledge of how data is fetched or displayed. Everything else depends on it.
+
+## Structure
+
+```
+lib/domain/
+├── entities/
+│   └── movie.dart
+├── datasources/
+│   └── movies_datasource.dart
+└── repositories/
+    └── movies_repository.dart
+```
+
+## The `Movie` entity
+
+`Movie` is the canonical representation of a film throughout the application. It is a plain Dart class with no serialization logic or external dependencies.
+
+```dart
+class Movie {
+  final bool adult;
+  final String backdropPath;
+  final List<int> genreIds;
+  final int id;
+  final String originalLanguage;
+  final String originalTitle;
+  final String overview;
+  final double popularity;
+  final String posterPath;
+  final DateTime releaseDate;
+  final String title;
+  final bool video;
+  final double voteAverage;
+  final int voteCount;
+
+  Movie({
+    required this.adult,
+    required this.backdropPath,
+    required this.genreIds,
+    required this.id,
+    required this.originalLanguage,
+    required this.originalTitle,
+    required this.overview,
+    required this.popularity,
+    required this.posterPath,
+    required this.releaseDate,
+    required this.title,
+    required this.video,
+    required this.voteAverage,
+    required this.voteCount,
+  });
+}
+```
+
+### Field reference
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `int` | Unique TheMovieDB identifier |
+| `title` | `String` | Localized movie title |
+| `originalTitle` | `String` | Title in the original language |
+| `overview` | `String` | Plot summary |
+| `posterPath` | `String` | Full URL to the poster image |
+| `backdropPath` | `String` | Full URL to the backdrop image |
+| `releaseDate` | `DateTime` | Theatrical release date |
+| `voteAverage` | `double` | Average user rating (0–10) |
+| `voteCount` | `int` | Total number of ratings |
+| `popularity` | `double` | TheMovieDB popularity score |
+| `genreIds` | `List<int>` | Genre identifiers |
+| `originalLanguage` | `String` | ISO 639-1 language code |
+| `adult` | `bool` | Whether the film is adult-rated |
+| `video` | `bool` | Whether a video clip is available |
+
+<Note>
+`posterPath` and `backdropPath` on the domain entity are already full URLs. The infrastructure mapper is responsible for constructing them — the domain entity never knows about the image CDN.
+</Note>
+
+## Abstract datasource
+
+`MoviesDatasource` is an abstract class that declares what operations any data source must support. The domain defines the contract; the infrastructure fulfills it.
+
+```dart
+import 'package:cinemapedia_220083/domain/entities/movie.dart';
+
+abstract class MoviesDatasource {
+  Future<List<Movie>> getNowPlaying({int page = 1});
+  Future<List<Movie>> getPopular({int page = 1});
+  Future<List<Movie>> getUpcoming({int page = 1});
+  Future<List<Movie>> getTopRated({int page = 1});
+  Future<List<Movie>> getMexicanMovies({int page = 1});
+}
+```
+
+All methods accept a `page` parameter that defaults to `1`, enabling pagination without forcing callers to supply it.
+
+## Abstract repository
+
+`MoviesRepository` mirrors the datasource contract. The extra abstraction layer allows the application to swap datasources or add caching inside a repository implementation without changing the presentation layer.
+
+```dart
+import 'package:cinemapedia_220083/domain/entities/movie.dart';
+
+abstract class MoviesRepository {
+  Future<List<Movie>> getNowPlaying({int page = 1});
+  Future<List<Movie>> getPopular({int page = 1});
+  Future<List<Movie>> getUpcoming({int page = 1});
+  Future<List<Movie>> getTopRated({int page = 1});
+  Future<List<Movie>> getMexicanMovies({int page = 1});
+}
+```
+
+<Tip>
+The repository and datasource abstractions look identical here, but they serve different purposes. The datasource is about raw data access; the repository is where business logic (caching, merging sources, error handling) would live as the app grows.
+</Tip>

@@ -1,0 +1,229 @@
+---
+title: "Infrastructure layer"
+description: "The infrastructure layer implements the domain contracts, handling HTTP requests to TheMovieDB API, JSON deserialization, and mapping to domain entities."
+---
+
+The infrastructure layer is where external concerns live: HTTP clients, JSON models, and data transformation. It implements every abstract class defined in the domain.
+
+## Structure
+
+```
+lib/infrastructure/
+├── datasources/
+│   └── moviedb_datasource.dart
+├── mappers/
+│   └── movie_mapper.dart
+├── models/
+│   └── moviedb/
+│       ├── movie_moviedb.dart
+│       └── moviedb_response.dart
+└── repositories/
+    └── movie_repository_impl.dart
+```
+
+## Concrete datasource
+
+`MoviedbDataSource` implements `MoviesDatasource` using [Dio](https://pub.dev/packages/dio) as the HTTP client. It is configured once at construction time with the base URL, API key, and language.
+
+```dart
+class MoviedbDataSource extends MoviesDatasource {
+  final Dio dio = Dio(
+    BaseOptions(
+      baseUrl: 'https://api.themoviedb.org/3',
+      queryParameters: {
+        'api_key': Environment.theMovieDbKey,
+        'language': 'es-MX',
+      },
+    ),
+  );
+
+  @override
+  Future<List<Movie>> getNowPlaying({int page = 1}) async {
+    final response = await dio.get(
+      '/movie/now_playing',
+      queryParameters: {'page': page},
+    );
+
+    final movieDBResponse = MovieDbResponse.fromJson(response.data);
+
+    final List<Movie> movies = movieDBResponse.results
+        .where((moviedb) => moviedb.posterPath != 'no-poster')
+        .map((moviedb) => MovieMapper.movieDBToEntity(moviedb))
+        .toList();
+
+    return movies;
+  }
+
+  // ... getPopular, getUpcoming, getTopRated follow the same pattern
+}
+```
+
+Every method follows the same three-step pattern:
+
+1. Make a GET request with the page number
+2. Deserialize the response into `MovieDbResponse`
+3. Filter out movies with no poster, then map each to a domain `Movie`
+
+### Mexican movies endpoint
+
+The `getMexicanMovies` method uses the `/discover/movie` endpoint with additional filters:
+
+```dart
+@override
+Future<List<Movie>> getMexicanMovies({int page = 1}) async {
+  final response = await dio.get(
+    '/discover/movie',
+    queryParameters: {
+      'page': page,
+      'region': 'MX',
+      'withOriginalLanguaje': 'es',
+      'with_origin_country': 'MX',
+      'sort_by': 'vote_average.desc',
+      'vote_count.gte': 10,
+    },
+  );
+
+  final movieDBResponse = MovieDbResponse.fromJson(response.data);
+
+  final List<Movie> movies = movieDBResponse.results
+      .where((moviedb) => moviedb.posterPath != 'no-poster')
+      .map((moviedb) => MovieMapper.movieDBToEntity(moviedb))
+      .toList();
+
+  return movies;
+}
+```
+
+## API response models
+
+### `MovieDbResponse`
+
+Represents the top-level JSON envelope returned by TheMovieDB list endpoints.
+
+```dart
+class MovieDbResponse {
+  final Dates? dates;
+  final int page;
+  final List<MovieMovieDB> results;
+  final int totalPages;
+  final int totalResults;
+
+  factory MovieDbResponse.fromJson(Map<String, dynamic> json) =>
+      MovieDbResponse(
+        dates: json["dates"] != null ? Dates.fromJson(json["dates"]) : null,
+        page: json["page"],
+        results: List<MovieMovieDB>.from(
+          json["results"].map((x) => MovieMovieDB.fromJson(x)),
+        ),
+        totalPages: json["total_pages"],
+        totalResults: json["total_results"],
+      );
+}
+```
+
+### `MovieMovieDB`
+
+Maps the per-film JSON object from the API. The `fromJson` factory applies safe defaults for nullable fields:
+
+```dart
+factory MovieMovieDB.fromJson(Map<String, dynamic> json) => MovieMovieDB(
+  adult: json["adult"] ?? false,
+  backdropPath: json["backdrop_path"] ?? '',
+  genreIds: List<int>.from(json["genre_ids"].map((x) => x)),
+  id: json["id"],
+  originalLanguage: json["original_language"],
+  originalTitle: json["original_title"],
+  overview: json["overview"] ?? '',
+  popularity: json["popularity"]?.toDouble(),
+  posterPath: json["poster_path"] ?? '',
+  releaseDate:
+      (json["release_date"] != null &&
+          json["release_date"].toString().isNotEmpty)
+      ? DateTime.tryParse(json["release_date"]) ?? DateTime(1900)
+      : DateTime(1900),
+  title: json["title"],
+  video: json["video"],
+  voteAverage: json["vote_average"]?.toDouble(),
+  voteCount: json["vote_count"],
+);
+```
+
+<Note>
+`releaseDate` defaults to `DateTime(1900)` when the API returns a null or empty string rather than throwing a parse error.
+</Note>
+
+## Mapper
+
+`MovieMapper` is a stateless utility class with a single static method that converts a `MovieMovieDB` model into a domain `Movie` entity.
+
+```dart
+class MovieMapper {
+  static Movie movieDBToEntity(MovieMovieDB moviedb) => Movie(
+    adult: moviedb.adult,
+    backdropPath: (moviedb.backdropPath != '')
+        ? 'http://image.tmdb.org/t/p/w500${moviedb.backdropPath}'
+        : 'https://sd.keepcalms.com/i-w600/keep-calm-poster-not-found.jpg',
+    genreIds: moviedb.genreIds,
+    id: moviedb.id,
+    originalLanguage: moviedb.originalLanguage,
+    originalTitle: moviedb.originalTitle,
+    overview: moviedb.overview,
+    popularity: moviedb.popularity,
+    posterPath: (moviedb.posterPath != '')
+        ? 'http://image.tmdb.org/t/p/w500${moviedb.posterPath}'
+        : 'no-poster',
+    releaseDate: moviedb.releaseDate,
+    title: moviedb.title,
+    video: moviedb.video,
+    voteAverage: moviedb.voteAverage,
+    voteCount: moviedb.voteCount,
+  );
+}
+```
+
+Key transformations applied by the mapper:
+
+- `backdropPath` — prepends the TMDB image CDN base URL (`http://image.tmdb.org/t/p/w500`); falls back to a placeholder image if the path is empty
+- `posterPath` — same CDN construction; returns the string `'no-poster'` when empty (the datasource later filters these out)
+- All other fields pass through unchanged
+
+## Repository implementation
+
+`MovieRepositoryImpl` implements `MoviesRepository` by delegating every call directly to the injected datasource. It decouples the presentation layer from any specific datasource.
+
+```dart
+class MovieRepositoryImpl implements MoviesRepository {
+  final MoviesDatasource datasource;
+
+  MovieRepositoryImpl(this.datasource);
+
+  @override
+  Future<List<Movie>> getNowPlaying({int page = 1}) {
+    return datasource.getNowPlaying(page: page);
+  }
+
+  @override
+  Future<List<Movie>> getPopular({int page = 1}) {
+    return datasource.getPopular(page: page);
+  }
+
+  @override
+  Future<List<Movie>> getUpcoming({int page = 1}) {
+    return datasource.getUpcoming(page: page);
+  }
+
+  @override
+  Future<List<Movie>> getTopRated({int page = 1}) {
+    return datasource.getTopRated(page: page);
+  }
+
+  @override
+  Future<List<Movie>> getMexicanMovies({int page = 1}) {
+    return datasource.getMexicanMovies(page: page);
+  }
+}
+```
+
+<Tip>
+Because `MovieRepositoryImpl` accepts any `MoviesDatasource`, swapping `MoviedbDataSource` for a local cache or a mock in tests requires changing only the constructor call at the provider level.
+</Tip>

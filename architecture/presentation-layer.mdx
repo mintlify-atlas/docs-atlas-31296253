@@ -1,0 +1,207 @@
+---
+title: "Presentation layer"
+description: "The presentation layer manages UI state with Riverpod providers and renders movies through screens and widgets built with Flutter."
+---
+
+The presentation layer is responsible for everything the user sees and interacts with. It reads from the domain through Riverpod providers and never touches the infrastructure directly.
+
+## Structure
+
+```
+lib/presentation/
+├── screens/
+│   └── movies/
+│       └── home_screen.dart
+├── providers/
+│   └── movies/
+│       ├── movies_providers.dart
+│       └── movies_repository_provider.dart
+└── widgets/
+```
+
+## Provider setup
+
+### Repository provider
+
+The entry point for dependency injection is `movieRepositoryProvider`. It wires together the concrete datasource and repository, producing the single `MoviesRepository` instance used throughout the app.
+
+```dart
+final movieRepositoryProvider = Provider((ref) {
+  return MovieRepositoryImpl(MoviedbDataSource());
+});
+```
+
+This is the only place in the codebase where infrastructure classes are instantiated. Everything above this layer depends on the `MoviesRepository` abstraction.
+
+### `MoviesNotifier` and pagination
+
+`MoviesNotifier` is a generic `Notifier<List<Movie>>` that manages an append-only list of movies. The same class powers every movie category by accepting a different callback at construction time.
+
+```dart
+typedef MovieCallback = Future<List<Movie>> Function({int page});
+
+class MoviesNotifier extends Notifier<List<Movie>> {
+  final MovieCallback Function(Ref ref) _callbackBuilder;
+  late final MovieCallback fetchMoreMovies;
+
+  MoviesNotifier(this._callbackBuilder);
+
+  int currentPage = 0;
+  bool isLoading = false;
+
+  @override
+  List<Movie> build() {
+    fetchMoreMovies = _callbackBuilder(ref);
+    return [];
+  }
+
+  Future<void> loadNextPage() async {
+    if (isLoading) return;
+    isLoading = true;
+
+    currentPage++;
+    final movies = await fetchMoreMovies(page: currentPage);
+
+    state = [...state, ...movies];
+
+    isLoading = false;
+  }
+}
+```
+
+**Pagination mechanics:**
+
+- `currentPage` starts at `0` and increments before each request, so the first call always fetches page `1`
+- `isLoading` acts as a guard — calling `loadNextPage()` while a request is in flight is a no-op
+- New results are spread-appended to the existing state list, triggering a widget rebuild
+
+### Category providers
+
+Each movie category gets its own `NotifierProvider`. They all share `MoviesNotifier` but are configured with a different repository method:
+
+```dart
+final nowPlayingMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getNowPlaying,
+  ),
+);
+
+final popularMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getPopular,
+  ),
+);
+
+final upcomingMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getUpcoming,
+  ),
+);
+
+final topratedMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getTopRated,
+  ),
+);
+
+final mexicanMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getMexicanMovies,
+  ),
+);
+```
+
+<Note>
+The `_callbackBuilder` pattern lets `MoviesNotifier` remain reusable across all five categories without subclassing. The callback is resolved lazily inside `build()` so that `ref` is available at the right lifecycle moment.
+</Note>
+
+## Home screen
+
+`HomeScreen` is the main entry point for the app. It delegates all rendering to its internal `_HomeView` widget.
+
+```dart
+class HomeScreen extends StatelessWidget {
+  static const name = 'home-screen';
+
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: _HomeView(),
+      bottomNavigationBar: CustomBottomNavigationbar(),
+    );
+  }
+}
+```
+
+`_HomeView` is a `ConsumerStatefulWidget` so it can call providers in `initState` to trigger the initial page load for all five categories:
+
+```dart
+class _HomeViewState extends ConsumerState<_HomeView> {
+  @override
+  void initState() {
+    super.initState();
+
+    ref.read(nowPlayingMoviesProvider.notifier).loadNextPage();
+    ref.read(popularMoviesProvider.notifier).loadNextPage();
+    ref.read(topratedMoviesProvider.notifier).loadNextPage();
+    ref.read(upcomingMoviesProvider.notifier).loadNextPage();
+    ref.read(mexicanMoviesProvider.notifier).loadNextPage();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initialLoading = ref.watch(intialLoadingProvider);
+
+    if (initialLoading) return const FullscreenLoader();
+
+    final nowPlayingMovies = ref.watch(nowPlayingMoviesProvider);
+    final popular = ref.watch(popularMoviesProvider);
+    final topRated = ref.watch(topratedMoviesProvider);
+    final upcomingMovies = ref.watch(upcomingMoviesProvider);
+    final mexicanMovies = ref.watch(mexicanMoviesProvider);
+    final slideShowMovies = ref.watch(movieSlideShowProvider);
+
+    return CustomScrollView(
+      slivers: [
+        const SliverAppBar(floating: true, title: CustomAppbar()),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              if (index > 0) return null;
+              return Column(
+                children: [
+                  MovieSlideshow(movies: slideShowMovies),
+                  MovieHorizontalListview(
+                    movies: nowPlayingMovies,
+                    title: 'En cines',
+                    loadNextPage: () =>
+                        ref.read(nowPlayingMoviesProvider.notifier).loadNextPage(),
+                  ),
+                  MovieHorizontalListview(
+                    movies: upcomingMovies,
+                    title: 'Próximamente',
+                    loadNextPage: () =>
+                        ref.read(upcomingMoviesProvider.notifier).loadNextPage(),
+                  ),
+                  // ... popular, topRated, mexicanMovies follow the same pattern
+                ],
+              );
+            },
+            childCount: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+## Infinite scroll pattern
+
+Each `MovieHorizontalListview` receives a `loadNextPage` callback. When the user scrolls to the end of a horizontal list, the widget calls the callback, which invokes `loadNextPage()` on the corresponding notifier. The notifier increments `currentPage`, fetches the next batch, and appends it to state — causing the list to grow without replacing existing items.
+
+<Tip>
+The `isLoading` guard inside `MoviesNotifier.loadNextPage()` means that rapid scroll events or multiple widget rebuilds cannot trigger duplicate network requests for the same page.
+</Tip>

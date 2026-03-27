@@ -1,0 +1,147 @@
+---
+title: "Shared widgets"
+description: "App-wide UI components used across screens: CustomAppbar, CustomBottomNavigationbar, and FullscreenLoader."
+---
+
+The `shared/` directory contains widgets that are not tied to a specific feature. They are re-exported from `lib/presentation/widgets/widgets.dart` so every screen can import them from one place.
+
+```dart
+import 'package:cinemapedia_220083/presentation/widgets/widgets.dart';
+```
+
+---
+
+## CustomAppbar
+
+A `StatelessWidget` that renders the app's top navigation bar. It is designed to be embedded inside a `SliverAppBar` rather than used as a standalone `AppBar`.
+
+### What it renders
+
+- A movie-reel icon (`Icons.movie_outlined`) tinted with the primary theme color.
+- The app name **Cinemapedia_220083** in `titleMedium` text style.
+- A search icon button on the trailing edge (currently a no-op placeholder).
+
+The widget wraps its content in `SafeArea(bottom: false)` to respect system status-bar insets without adding bottom padding.
+
+### Constructor
+
+```dart
+const CustomAppbar({super.key});
+```
+
+This widget has no configurable parameters. All styling is sourced from the active `ThemeData`.
+
+### Usage
+
+```dart
+// Embedded in a SliverAppBar for scroll-away behavior
+CustomScrollView(
+  slivers: [
+    const SliverAppBar(
+      floating: true,
+      title: CustomAppbar(),
+    ),
+    // ...
+  ],
+);
+```
+
+<Note>
+  The search button is a visual placeholder. Wiring it to a search screen requires adding an `onPressed` handler or refactoring `CustomAppbar` to accept a callback parameter.
+</Note>
+
+### Source location
+
+`lib/presentation/widgets/shared/custom_appbar.dart`
+
+---
+
+## CustomBottomNavigationbar
+
+A `StatelessWidget` that renders a three-tab `BottomNavigationBar` for the app's primary navigation destinations.
+
+### Tabs
+
+| Index | Icon | Label |
+|-------|------|-------|
+| 0 | `Icons.home_max` | Inicio |
+| 1 | `Icons.label_outline` | Categoria |
+| 2 | `Icons.favorite_outline` | Favoritos |
+
+### Constructor
+
+```dart
+const CustomBottomNavigationbar({super.key});
+```
+
+This widget has no configurable parameters. Tab selection state and `onTap` routing are not yet implemented — the bar is a static layout.
+
+### Usage
+
+```dart
+// Passed directly to Scaffold.bottomNavigationBar
+Scaffold(
+  body: _HomeView(),
+  bottomNavigationBar: const CustomBottomNavigationbar(),
+);
+```
+
+<Warning>
+  The `BottomNavigationBar` does not manage its `currentIndex` or respond to taps. To enable tab switching, refactor this widget to accept a `currentIndex` and `onTap` parameter, or lift the selection state to the parent screen.
+</Warning>
+
+### Source location
+
+`lib/presentation/widgets/shared/custom_bottom_navigationbar.dart`
+
+---
+
+## FullscreenLoader
+
+A `StatelessWidget` that fills the screen with a centered loading indicator and a sequence of status messages. It is shown on the home screen while all initial movie data providers are still fetching.
+
+### What it renders
+
+1. A welcome text: **"Bienvenid@ a Cinemapedia 220083"**
+2. A `CircularProgressIndicator` with stroke width 4.
+3. A `StreamBuilder` that cycles through status messages every 3 seconds.
+
+### Loading messages
+
+The internal `getLoadingMessages()` method emits the following strings in order, one every 3 seconds, then closes:
+
+1. Estableciendo elementos de comunicación
+2. Conectando a la API de TheMovieDB
+3. Obteniendo las películas que actualmente se proyectan
+4. Obteniendo los proximos estrenos
+5. Obteniendo las peliculas mejor valoradas
+6. Obteniendo las mejores películas Mexicanas
+7. Todo listo...comencemos
+
+### Constructor
+
+```dart
+const FullscreenLoader({super.key});
+```
+
+This widget has no configurable parameters.
+
+### Usage
+
+```dart
+// Shown while initial providers are loading
+final initialLoading = ref.watch(intialLoadingProvider);
+
+if (initialLoading) return const FullscreenLoader();
+
+// Normal screen content rendered once loading is complete
+return CustomScrollView(/* ... */);
+```
+
+<Tip>
+  `intialLoadingProvider` resolves to `true` until all five movie-category providers have loaded at least one page. Once it resolves to `false`, `FullscreenLoader` is replaced by the home screen content.
+</Tip>
+
+### Source location
+
+`lib/presentation/widgets/shared/fullscreen_loader.dart`

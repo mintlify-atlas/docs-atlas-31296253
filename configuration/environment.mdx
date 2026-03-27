@@ -1,0 +1,85 @@
+---
+title: "Environment Configuration"
+description: "Set up API keys and sensitive configuration using a .env file loaded at startup by flutter_dotenv."
+---
+
+Cinemapedia reads sensitive configuration values — such as the TheMovieDB API key — from a `.env` file at runtime. The file is loaded before the app starts using the `flutter_dotenv` package.
+
+## Prerequisites
+
+Make sure `flutter_dotenv` is listed in your `pubspec.yaml` dependencies and that the `.env` file is declared as a Flutter asset:
+
+```yaml pubspec.yaml
+dependencies:
+  flutter_dotenv: ^6.0.0
+
+flutter:
+  assets:
+    - .env
+```
+
+## Creating the .env file
+
+Create a `.env` file in the **root of the project** (next to `pubspec.yaml`) with the following content:
+
+```env .env
+THE_MOVIEDB_KEY=your_api_key_here
+```
+
+Replace `your_api_key_here` with a valid API key from [TheMovieDB](https://www.themoviedb.org/settings/api).
+
+<Warning>
+Never commit the `.env` file to version control. It contains secret API keys that should not be exposed in a public repository. Add `.env` to your `.gitignore` file immediately.
+
+```bash .gitignore
+.env
+```
+</Warning>
+
+## How the .env file is loaded
+
+`main()` is declared `async` and calls `dotenv.load()` before `runApp`, guaranteeing that environment variables are available as soon as any widget or service requests them.
+
+```dart lib/main.dart
+Future<void> main() async {
+  // Loads all variables from the .env file into dotenv.env
+  await dotenv.load(fileName: '.env');
+
+  runApp(const ProviderScope(child: MainApp()));
+}
+```
+
+## The Environment class
+
+All environment variable access is centralised in a single class so the rest of the app never imports `flutter_dotenv` directly.
+
+```dart lib/config/constants/environment.dart
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+class Environment {
+  static String theMovieDbKey =
+      dotenv.env['THE_MOVIEDB_KEY'] ?? 'No hay api key';
+}
+```
+
+If `THE_MOVIEDB_KEY` is missing from the `.env` file, the field falls back to the string `'No hay api key'`. API calls will fail in this state, so always verify the key is present before running the app.
+
+## Environment variables reference
+
+<ParamField path="THE_MOVIEDB_KEY" type="string" required>
+  API key for [TheMovieDB](https://www.themoviedb.org/). Used to authenticate every HTTP request made to the TMDB REST API. Obtain a free key by creating an account and requesting API access in your account settings.
+</ParamField>
+
+## Using the value in your code
+
+Import the `Environment` class wherever you need the key:
+
+```dart
+import 'package:cinemapedia_220083/config/constants/environment.dart';
+
+final apiKey = Environment.theMovieDbKey;
+```
+
+<Note>
+Because `theMovieDbKey` is a `static` field it is read once when the class is first loaded. `dotenv.load()` must complete before any code accesses `Environment.theMovieDbKey`, which is why it is awaited in `main()`.
+</Note>

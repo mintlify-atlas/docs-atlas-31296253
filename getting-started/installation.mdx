@@ -1,0 +1,55 @@
+---
+title: "Installation"
+description: "Clone the Cinemapedia repository, configure your API key, and run the app."
+---
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/juuaaann456/DMI-Practica06.git
+    cd DMI-Practica06
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Fetch all Dart/Flutter packages declared in `pubspec.yaml`:
+
+    ```bash
+    flutter pub get
+    ```
+  </Step>
+
+  <Step title="Create the .env file">
+    Cinemapedia loads configuration from a `.env` file in the project root. Create the file and add your TheMovieDB API key:
+
+    ```bash
+    # .env
+    THE_MOVIEDB_KEY=your_api_key_here
+    ```
+
+    Replace `your_api_key_here` with the API Key (v3 auth) you obtained from TheMovieDB.
+
+    <Warning>
+      Never commit your `.env` file to version control. The file contains your secret API key. Add it to `.gitignore` if it is not already listed there.
+    </Warning>
+
+    <Note>
+      The app reads `THE_MOVIEDB_KEY` at startup via `flutter_dotenv`. If the variable is missing or the file does not exist, API calls will fail.
+    </Note>
+  </Step>
+
+  <Step title="Run the app">
+    Connect a device or start an emulator, then run:
+
+    ```bash
+    flutter run
+    ```
+
+    To target a specific device, list available devices first:
+
+    ```bash
+    flutter devices
+    flutter run -d <device_id>
+    ```
+  </Step>
+</Steps>

@@ -1,0 +1,52 @@
+---
+title: "MovieSlideshow"
+description: "An auto-playing banner carousel that displays movie backdrop images at the top of the home screen."
+---
+
+`MovieSlideshow` is a `StatelessWidget` that renders a full-width swipeable carousel of movie backdrops. It uses the [`card_swiper`](https://pub.dev/packages/card_swiper) package to produce an auto-playing slideshow with dot-based pagination. The active dot color is driven by the current theme's primary color.
+
+The widget is rendered at a fixed height of **210 px** and reads from the `movieSlideShowProvider` on the home screen, which supplies the first six now-playing movies.
+
+## Constructor
+
+```dart
+const MovieSlideshow({super.key, required this.movies});
+```
+
+## Parameters
+
+<ParamField path="movies" type="List<Movie>" required>
+  The list of `Movie` entities whose `backdropPath` URLs are displayed as slides. Each slide is rendered as a rounded-corner image card with a drop shadow.
+</ParamField>
+
+## Behavior
+
+- Slides advance automatically (`autoplay: true`).
+- The visible slide takes up 80 % of the viewport width (`viewportFraction: 0.8`); adjacent slides are scaled to 90 % (`scale: 0.9`), giving a depth effect.
+- Tapping a slide does **not** navigate — navigation is not wired in this widget. Use `MovieHorizontalListview` when you need tap-to-detail behavior.
+- Dot pagination is rendered below the slides and aligns to the bottom of the `SizedBox`.
+
+<Note>
+  Each `Movie` must have a non-empty `backdropPath`. The widget calls `Image.network` directly without a fallback, so broken URLs will show Flutter's default broken-image placeholder.
+</Note>
+
+## Usage example
+
+The following excerpt is taken from `home_screen.dart`. The provider filters the now-playing list down to the first several movies used as featured slides.
+
+```dart
+// Inside _HomeViewState.build()
+final slideShowMovies = ref.watch(movieSlideShowProvider);
+
+// ...
+
+MovieSlideshow(movies: slideShowMovies);
+```
+
+<Tip>
+  `movieSlideShowProvider` is a derived provider that returns a subset of `nowPlayingMoviesProvider`. You can supply any `List<Movie>` — for example, top-rated movies — to reuse this widget in other screens.
+</Tip>
+
+## Source location
+
+`lib/presentation/widgets/movies/movie_slideshow.dart`

@@ -1,0 +1,120 @@
+---
+title: "Movie Entity"
+description: "Domain entity that represents a movie throughout the Cinemapedia app. Pure Dart class with no framework dependencies."
+---
+
+`Movie` is the central data structure used by every layer of the app — providers, widgets, and repositories all pass `Movie` objects. It lives in the **domain** layer, which means it has no dependency on Flutter, Riverpod, or any external package.
+
+## Class definition
+
+```dart lib/domain/entities/movie.dart
+class Movie {
+  final bool adult;
+  final String backdropPath;
+  final List<int> genreIds;
+  final int id;
+  final String originalLanguage;
+  final String originalTitle;
+  final String overview;
+  final double popularity;
+  final String posterPath;
+  final DateTime releaseDate;
+  final String title;
+  final bool video;
+  final double voteAverage;
+  final int voteCount;
+
+  Movie({
+    required this.adult,
+    required this.backdropPath,
+    required this.genreIds,
+    required this.id,
+    required this.originalLanguage,
+    required this.originalTitle,
+    required this.overview,
+    required this.popularity,
+    required this.posterPath,
+    required this.releaseDate,
+    required this.title,
+    required this.video,
+    required this.voteAverage,
+    required this.voteCount,
+  });
+}
+```
+
+---
+
+## Fields
+
+<ResponseField name="adult" type="bool" required>
+  Indicates whether the movie is restricted to adult audiences.
+</ResponseField>
+
+<ResponseField name="backdropPath" type="String" required>
+  Absolute URL to the backdrop image (`w500` size). Built by `MovieMapper` from the raw path returned by the API. Defaults to a placeholder image URL when the API returns an empty string.
+</ResponseField>
+
+<ResponseField name="genreIds" type="List&lt;int&gt;" required>
+  List of TheMovieDB genre identifiers associated with the movie.
+</ResponseField>
+
+<ResponseField name="id" type="int" required>
+  Unique TheMovieDB identifier for the movie.
+</ResponseField>
+
+<ResponseField name="originalLanguage" type="String" required>
+  ISO 639-1 language code of the movie's original language (e.g. `"en"`, `"es"`).
+</ResponseField>
+
+<ResponseField name="originalTitle" type="String" required>
+  Title of the movie in its original language.
+</ResponseField>
+
+<ResponseField name="overview" type="String" required>
+  Short plot summary. May be an empty string if the API did not provide one.
+</ResponseField>
+
+<ResponseField name="popularity" type="double" required>
+  TheMovieDB popularity score. Higher values indicate more views and interactions on the platform.
+</ResponseField>
+
+<ResponseField name="posterPath" type="String" required>
+  Absolute URL to the poster image (`w500` size). Built by `MovieMapper`. Falls back to the string `"no-poster"` when the API returns an empty string.
+</ResponseField>
+
+<ResponseField name="releaseDate" type="DateTime" required>
+  Theatrical release date. When the API returns a null or empty date string, `MovieMapper` defaults this to `DateTime(1900)`.
+</ResponseField>
+
+<ResponseField name="title" type="String" required>
+  Localised display title of the movie.
+</ResponseField>
+
+<ResponseField name="video" type="bool" required>
+  `true` if the entry is a video release rather than a theatrical film.
+</ResponseField>
+
+<ResponseField name="voteAverage" type="double" required>
+  Average user rating on TheMovieDB, on a scale of 0 to 10.
+</ResponseField>
+
+<ResponseField name="voteCount" type="int" required>
+  Total number of user votes that make up `voteAverage`.
+</ResponseField>
+
+---
+
+## Domain layer design
+
+`Movie` is a **plain Dart class** — no `json_serializable`, no `freezed`, no Flutter imports. This is intentional:
+
+- The domain layer stays portable and testable without a Flutter environment.
+- All serialization logic lives in `MovieMovieDB.fromJson()` in the infrastructure layer.
+- All API-to-domain transformation logic lives in `MovieMapper.movieDBToEntity()`.
+
+Widgets and providers never instantiate `Movie` directly; they receive instances that have already been mapped from `MovieMovieDB` by the datasource layer.
+
+<Note>
+  If you add a new field to `Movie`, you must also add it to `MovieMovieDB`, update `MovieMovieDB.fromJson()` / `toJson()`, and update `MovieMapper.movieDBToEntity()`.
+</Note>

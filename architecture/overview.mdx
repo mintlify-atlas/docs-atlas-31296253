@@ -1,0 +1,75 @@
+---
+title: "Architecture overview"
+description: "Cinemapedia uses a three-layer clean architecture to separate concerns between data fetching, business logic, and UI rendering."
+---
+
+Cinemapedia is organized around three distinct layers that communicate through well-defined contracts. Each layer has a single responsibility and depends only on the layer below it — never above.
+
+## Layer structure
+
+```
+┌─────────────────────────────────────────┐
+│           Presentation layer            │
+│   Screens · Widgets · Riverpod providers│
+└────────────────┬────────────────────────┘
+                 │ depends on
+┌────────────────▼────────────────────────┐
+│              Domain layer               │
+│   Entities · Abstract datasources       │
+│   Abstract repositories                 │
+└──────┬──────────────────────────────────┘
+       │ implemented by
+┌──────▼──────────────────────────────────┐
+│          Infrastructure layer           │
+│   Concrete datasources · API models     │
+│   Mappers · Repository implementations │
+└─────────────────────────────────────────┘
+```
+
+## Dependency flow
+
+The dependency arrows point inward toward the domain:
+
+- **Presentation** depends on domain contracts (repositories, entities)
+- **Infrastructure** implements those domain contracts
+- **Domain** depends on nothing external
+
+This means the UI and the API can both change independently without breaking the business rules at the center.
+
+<Note>
+The domain layer contains no Flutter or HTTP imports — it is pure Dart. This makes it independently testable and portable.
+</Note>
+
+## Data flow for a movie list request
+
+<Steps>
+  <Step title="Provider triggers a load">
+    A Riverpod `NotifierProvider` calls `loadNextPage()`, incrementing the page counter and calling the repository method.
+  </Step>
+  <Step title="Repository delegates to datasource">
+    `MovieRepositoryImpl` forwards the call to the injected `MoviesDatasource`, applying no extra transformation in this case.
+  </Step>
+  <Step title="Datasource fetches from the API">
+    `MoviedbDataSource` makes an HTTP GET request via Dio to TheMovieDB API and deserializes the JSON response into `MovieDbResponse`.
+  </Step>
+  <Step title="Mapper converts to domain entity">
+    `MovieMapper.movieDBToEntity()` transforms each `MovieMovieDB` model into a `Movie` entity, constructing full image URLs in the process.
+  </Step>
+  <Step title="State is updated">
+    The new movies are appended to the existing list in the notifier's state, triggering a widget rebuild.
+  </Step>
+</Steps>
+
+## Explore each layer
+
+<CardGroup cols={3}>
+  <Card title="Domain layer" icon="cube" href="/architecture/domain-layer">
+    Entities, abstract datasource contracts, and repository interfaces that define the application's business rules.
+  </Card>
+  <Card title="Infrastructure layer" icon="server" href="/architecture/infrastructure-layer">
+    Concrete HTTP datasource, API response models, mappers, and the repository implementation.
+  </Card>
+  <Card title="Presentation layer" icon="monitor" href="/architecture/presentation-layer">
+    Screens, widgets, and Riverpod providers that manage UI state and trigger data loads.
+  </Card>
+</CardGroup>

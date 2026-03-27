@@ -1,0 +1,119 @@
+---
+title: "Navigation"
+description: "How Cinemapedia uses GoRouter to define routes and navigate between the home screen and individual movie detail screens."
+---
+
+Cinemapedia uses [GoRouter](https://pub.dev/packages/go_router) for declarative, URL-based navigation. The router configuration is defined in `lib/config/router/app_router.dart` and exported as the `appRouter` instance.
+
+## Router configuration
+
+```dart
+final appRouter = GoRouter(
+  initialLocation: '/',
+
+  routes: [
+    GoRoute(
+      path: '/',
+      name: HomeScreen.name,
+      builder: (context, state) => const HomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'movie/:id',
+          name: MovieScreen.name,
+          builder: (context, state) {
+            final movieId = state.pathParameters['id'] ?? 'no-id';
+            return MovieScreen(movieId: movieId);
+          },
+        ),
+      ],
+    ),
+  ],
+);
+```
+
+The `MovieScreen` route is nested under `HomeScreen`, making its full resolved path `/movie/:id`.
+
+## Routes
+
+| Route | Name constant | Screen | Description |
+|---|---|---|---|
+| `/` | `HomeScreen.name` (`'home-screen'`) | `HomeScreen` | Main screen with all movie categories |
+| `/movie/:id` | `MovieScreen.name` (`'movie-screen'`) | `MovieScreen` | Movie detail screen for a specific film |
+
+## The `movieId` path parameter
+
+The `:id` segment in `/movie/:id` is a named path parameter. GoRouter extracts it from `state.pathParameters`:
+
+```dart
+final movieId = state.pathParameters['id'] ?? 'no-id';
+return MovieScreen(movieId: movieId);
+```
+
+The `movieId` string is passed directly to `MovieScreen` as a required constructor parameter:
+
+```dart
+class MovieScreen extends StatelessWidget {
+  static const name = 'movie-screen';
+  final String movieId;
+
+  const MovieScreen({
+    super.key,
+    required this.movieId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('MovieID: $movieId'),
+      ),
+    );
+  }
+}
+```
+
+<Note>
+If the `:id` parameter is missing or cannot be parsed, the router falls back to the string `'no-id'`.
+</Note>
+
+## Navigating to a movie detail
+
+Navigation from a list item to the detail screen is triggered by a `GestureDetector` tap inside `MovieHorizontalListview`. It uses GoRouter's `context.push()` with the movie's ID interpolated into the path:
+
+```dart
+GestureDetector(
+  onTap: () => context.push('/movie/${movie.id}'),
+  child: FadeIn(child: child),
+)
+```
+
+<Steps>
+  <Step title="User taps a movie poster">
+    The `GestureDetector` in `_Slide` (inside `MovieHorizontalListview`) fires its `onTap` callback.
+  </Step>
+  <Step title="GoRouter pushes the detail route">
+    `context.push('/movie/${movie.id}')` adds `/movie/:id` on top of the current navigation stack, keeping `HomeScreen` in the back stack.
+  </Step>
+  <Step title="MovieScreen receives the ID">
+    GoRouter extracts the `:id` segment and passes it to `MovieScreen` as `movieId`.
+  </Step>
+</Steps>
+
+## Route name constants
+
+Both screens define a static `name` constant that is referenced in the router config. Using the constant instead of a raw string prevents typos and makes renaming safer:
+
+```dart
+// In HomeScreen
+static const name = 'home-screen';
+
+// In MovieScreen
+static const name = 'movie-screen';
+
+// In appRouter
+GoRoute(
+  path: '/',
+  name: HomeScreen.name,   // 'home-screen'
+  ...
+)
+```

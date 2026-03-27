@@ -1,0 +1,84 @@
+{
+  "projectType": "frontend",
+  "projectName": "Cinemapedia",
+  "projectDescription": "A Flutter mobile application that browses and displays movies from TheMovieDB API, organized by categories like Now Playing, Popular, Top Rated, Upcoming, and Mexican Cinema.",
+  "theme": "palm",
+  "primaryColor": "#3dcffc",
+  "lightColor": "#0b5b9c",
+  "darkColor": "#ffffff",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "getting-started/prerequisites", "getting-started/installation"]
+          },
+          {
+            "group": "Architecture",
+            "pages": ["architecture/overview", "architecture/domain-layer", "architecture/infrastructure-layer", "architecture/presentation-layer"]
+          },
+          {
+            "group": "Features",
+            "pages": ["features/home-screen", "features/movie-categories", "features/navigation"]
+          },
+          {
+            "group": "Configuration",
+            "pages": ["configuration/environment", "configuration/theme", "configuration/routing"]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Widgets",
+            "pages": ["reference/widgets/movie-slideshow", "reference/widgets/movie-horizontal-listview", "reference/widgets/shared-widgets"]
+          },
+          {
+            "group": "Providers",
+            "pages": ["reference/providers/movies-providers", "reference/providers/repository-provider"]
+          },
+          {
+            "group": "Data Models",
+            "pages": ["reference/models/movie-entity", "reference/models/moviedb-response"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Browse movies in multiple categories: Now Playing, Popular, Top Rated, Upcoming, and Mexican Cinema",
+    "Interactive movie slideshow with card swiper animations",
+    "Horizontal scrollable movie lists with infinite pagination",
+    "Clean Architecture with separated domain, infrastructure, and presentation layers",
+    "Riverpod state management for reactive UI updates",
+    "GoRouter-based declarative navigation",
+    "TheMovieDB API integration with Dio HTTP client",
+    "Material 3 design with customizable color scheme",
+    "Environment-based configuration with dotenv support"
+  ],
+  "publicApiSurface": [
+    "MoviedbDataSource.getNowPlaying({int page})",
+    "MoviedbDataSource.getPopular({int page})",
+    "MoviedbDataSource.getUpcoming({int page})",
+    "MoviedbDataSource.getTopRated({int page})",
+    "MoviedbDataSource.getMexicanMovies({int page})",
+    "nowPlayingMoviesProvider",
+    "popularMoviesProvider",
+    "upcomingMoviesProvider",
+    "topratedMoviesProvider",
+    "mexicanMoviesProvider",
+    "movieSlideShowProvider",
+    "intialLoadingProvider",
+    "movieRepositoryProvider",
+    "MoviesNotifier.loadNextPage()",
+    "AppTheme.getTheme()",
+    "appRouter (GoRouter)",
+    "HomeScreen (route: /)",
+    "MovieScreen (route: /movie/:id)",
+    "Movie entity",
+    "MovieMapper.movieDBToEntity()"
+  ]
+}

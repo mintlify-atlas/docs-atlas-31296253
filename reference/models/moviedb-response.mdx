@@ -1,0 +1,240 @@
+---
+title: "MovieDB Response Models"
+description: "Infrastructure models that deserialize TheMovieDB API responses and a mapper that converts them to domain Movie entities."
+---
+
+The `infrastructure/models/moviedb/` directory contains two classes that mirror the JSON structure returned by TheMovieDB REST API. They are used only inside the datasource layer; the rest of the app works exclusively with the domain `Movie` entity.
+
+## Class hierarchy
+
+```
+MovieDbResponse          ← top-level API response envelope
+  ├─ dates: Dates?       ← optional screening date range
+  └─ results: List<MovieMovieDB>  ← individual movie entries
+```
+
+---
+
+## `MovieDbResponse`
+
+Represents the full JSON object returned by paginated endpoints such as `/movie/now_playing`, `/movie/popular`, `/movie/upcoming`, `/movie/top_rated`, and the region-filtered discover endpoint.
+
+```dart moviedb_response.dart
+class MovieDbResponse {
+  final Dates? dates;
+  final int page;
+  final List<MovieMovieDB> results;
+  final int totalPages;
+  final int totalResults;
+
+  factory MovieDbResponse.fromJson(Map<String, dynamic> json) =>
+      MovieDbResponse(
+        dates: json["dates"] != null ? Dates.fromJson(json["dates"]) : null,
+        page: json["page"],
+        results: List<MovieMovieDB>.from(
+          json["results"].map((x) => MovieMovieDB.fromJson(x)),
+        ),
+        totalPages: json["total_pages"],
+        totalResults: json["total_results"],
+      );
+}
+```
+
+### Fields
+
+<ResponseField name="dates" type="Dates?">
+  Optional screening window. Only present on the `/movie/now_playing` endpoint. `null` for popular, upcoming, top-rated, and discover responses.
+</ResponseField>
+
+<ResponseField name="page" type="int" required>
+  Current page number returned by the API.
+</ResponseField>
+
+<ResponseField name="results" type="List&lt;MovieMovieDB&gt;" required>
+  List of movie entries for the current page. Each entry is deserialized as a `MovieMovieDB` object.
+</ResponseField>
+
+<ResponseField name="totalPages" type="int" required>
+  Total number of pages available for the query. Mapped from `total_pages` in the JSON.
+</ResponseField>
+
+<ResponseField name="totalResults" type="int" required>
+  Total number of movies matching the query across all pages. Mapped from `total_results` in the JSON.
+</ResponseField>
+
+---
+
+## `Dates`
+
+Represents the theatrical screening window included in now-playing responses.
+
+```dart moviedb_response.dart
+class Dates {
+  final DateTime maximum;
+  final DateTime minimum;
+
+  factory Dates.fromJson(Map<String, dynamic> json) => Dates(
+    maximum: DateTime.parse(json["maximum"]),
+    minimum: DateTime.parse(json["minimum"]),
+  );
+}
+```
+
+### Fields
+
+<ResponseField name="maximum" type="DateTime" required>
+  Latest date in the now-playing window. Parsed from an ISO 8601 date string (`"YYYY-MM-DD"`).
+</ResponseField>
+
+<ResponseField name="minimum" type="DateTime" required>
+  Earliest date in the now-playing window. Parsed from an ISO 8601 date string (`"YYYY-MM-DD"`).
+</ResponseField>
+
+---
+
+## `MovieMovieDB`
+
+Mirrors the shape of a single movie object inside the `results` array. Field names in `fromJson` match the snake_case keys used by TheMovieDB API.
+
+```dart movie_moviedb.dart
+class MovieMovieDB {
+  final bool adult;
+  final String backdropPath;
+  final List<int> genreIds;
+  final int id;
+  final String originalLanguage;
+  final String originalTitle;
+  final String overview;
+  final double popularity;
+  final String posterPath;
+  final DateTime releaseDate;
+  final String title;
+  final bool video;
+  final double voteAverage;
+  final int voteCount;
+
+  factory MovieMovieDB.fromJson(Map<String, dynamic> json) => MovieMovieDB(
+    adult: json["adult"] ?? false,
+    backdropPath: json["backdrop_path"] ?? '',
+    genreIds: List<int>.from(json["genre_ids"].map((x) => x)),
+    id: json["id"],
+    originalLanguage: json["original_language"],
+    originalTitle: json["original_title"],
+    overview: json["overview"] ?? '',
+    popularity: json["popularity"]?.toDouble(),
+    posterPath: json["poster_path"] ?? '',
+    releaseDate:
+        (json["release_date"] != null &&
+            json["release_date"].toString().isNotEmpty)
+        ? DateTime.tryParse(json["release_date"]) ?? DateTime(1900)
+        : DateTime(1900),
+    title: json["title"],
+    video: json["video"],
+    voteAverage: json["vote_average"]?.toDouble(),
+    voteCount: json["vote_count"],
+  );
+}
+```
+
+### Fields
+
+<ResponseField name="adult" type="bool" required>
+  Whether the movie has an adult content rating. Defaults to `false` when absent from the JSON.
+</ResponseField>
+
+<ResponseField name="backdropPath" type="String" required>
+  Raw path segment for the backdrop image (e.g. `"/abc123.jpg"`). Empty string when not provided. The mapper prepends the TMDB image base URL.
+</ResponseField>
+
+<ResponseField name="genreIds" type="List&lt;int&gt;" required>
+  Array of genre IDs from the `genre_ids` JSON key.
+</ResponseField>
+
+<ResponseField name="id" type="int" required>
+  Unique TheMovieDB movie identifier.
+</ResponseField>
+
+<ResponseField name="originalLanguage" type="String" required>
+  ISO 639-1 language code. Mapped from `original_language`.
+</ResponseField>
+
+<ResponseField name="originalTitle" type="String" required>
+  Title in the original language. Mapped from `original_title`.
+</ResponseField>
+
+<ResponseField name="overview" type="String" required>
+  Plot summary. Defaults to an empty string when the API omits this field.
+</ResponseField>
+
+<ResponseField name="popularity" type="double" required>
+  TheMovieDB popularity metric, coerced to `double` with `?.toDouble()`.
+</ResponseField>
+
+<ResponseField name="posterPath" type="String" required>
+  Raw path segment for the poster image (e.g. `"/xyz456.jpg"`). Empty string when not provided. Mapped from `poster_path`.
+</ResponseField>
+
+<ResponseField name="releaseDate" type="DateTime" required>
+  Parsed from the `release_date` string. Falls back to `DateTime(1900)` when the field is null, empty, or unparseable. Mapped from `release_date`.
+</ResponseField>
+
+<ResponseField name="title" type="String" required>
+  Localised display title.
+</ResponseField>
+
+<ResponseField name="video" type="bool" required>
+  `true` for video releases.
+</ResponseField>
+
+<ResponseField name="voteAverage" type="double" required>
+  Average rating, coerced to `double`. Mapped from `vote_average`.
+</ResponseField>
+
+<ResponseField name="voteCount" type="int" required>
+  Total vote count. Mapped from `vote_count`.
+</ResponseField>
+
+---
+
+## `MovieMapper`
+
+`MovieMapper.movieDBToEntity()` is the single function that converts a `MovieMovieDB` infrastructure model into a domain `Movie` entity. It lives in `lib/infrastructure/mappers/movie_mapper.dart`.
+
+```dart movie_mapper.dart
+class MovieMapper {
+  static Movie movieDBToEntity(MovieMovieDB moviedb) => Movie(
+    adult: moviedb.adult,
+    backdropPath: (moviedb.backdropPath != '')
+        ? 'http://image.tmdb.org/t/p/w500${moviedb.backdropPath}'
+        : 'https://sd.keepcalms.com/i-w600/keep-calm-poster-not-found.jpg',
+    genreIds: moviedb.genreIds,
+    id: moviedb.id,
+    originalLanguage: moviedb.originalLanguage,
+    originalTitle: moviedb.originalTitle,
+    overview: moviedb.overview,
+    popularity: moviedb.popularity,
+    posterPath: (moviedb.posterPath != '')
+        ? 'http://image.tmdb.org/t/p/w500${moviedb.posterPath}'
+        : 'no-poster',
+    releaseDate: moviedb.releaseDate,
+    title: moviedb.title,
+    video: moviedb.video,
+    voteAverage: moviedb.voteAverage,
+    voteCount: moviedb.voteCount,
+  );
+}
+```
+
+### Transformations applied
+
+| Field | Raw value (API) | Mapped value (domain) |
+|---|---|---|
+| `backdropPath` | `"/abc.jpg"` | `"http://image.tmdb.org/t/p/w500/abc.jpg"` |
+| `backdropPath` | `""` (empty) | Placeholder image URL |
+| `posterPath` | `"/xyz.jpg"` | `"http://image.tmdb.org/t/p/w500/xyz.jpg"` |
+| `posterPath` | `""` (empty) | `"no-poster"` |
+| All other fields | — | Passed through unchanged |
+
+<Note>
+  The image base URL uses HTTP, not HTTPS. If your environment or device policy requires HTTPS, update the base URL constant in `MovieMapper` and adjust any network security configuration accordingly.
+</Note>

@@ -1,0 +1,113 @@
+---
+title: "Repository Provider"
+description: "Riverpod provider that wires the MovieRepositoryImpl and MoviedbDataSource together and makes them available to the rest of the app."
+---
+
+`movieRepositoryProvider` is a Riverpod `Provider` that constructs the single shared instance of `MovieRepositoryImpl` for the entire widget tree. All movie-list providers depend on it to reach the TheMovieDB API.
+
+## Provider definition
+
+```dart movies_repository_provider.dart
+import 'package:cinemapedia_220083/infrastructure/datasources/moviedb_datasource.dart';
+import 'package:cinemapedia_220083/infrastructure/repositories/movie_repository_impl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final movieRepositoryProvider = Provider((ref) {
+  return MovieRepositoryImpl(MoviedbDataSource());
+});
+```
+
+### Return type
+
+`movieRepositoryProvider` is inferred as `Provider<MovieRepositoryImpl>`. Because `MovieRepositoryImpl` implements the abstract `MoviesRepository` contract, consumers only need to depend on the interface.
+
+---
+
+## Dependency injection pattern
+
+The provider uses **constructor injection**: `MovieRepositoryImpl` receives a `MoviedbDataSource` instance through its constructor. This creates a strict, one-directional dependency chain:
+
+```
+UI (ConsumerWidget)
+  └─ ref.watch(movieRepositoryProvider)
+       └─ MovieRepositoryImpl          ← infrastructure/repositories/
+            └─ MoviedbDataSource       ← infrastructure/datasources/
+                 └─ TheMovieDB REST API
+```
+
+Neither the UI nor the notifiers need to know about `MoviedbDataSource` directly. They interact only through the `MoviesRepository` abstract interface, which makes it straightforward to swap the data source (e.g. a mock or a local cache) without touching any presentation code.
+
+---
+
+## `MovieRepositoryImpl`
+
+`MovieRepositoryImpl` implements every method declared in the `MoviesRepository` abstract class by delegating to the injected `MoviesDatasource`.
+
+```dart movie_repository_impl.dart
+class MovieRepositoryImpl implements MoviesRepository {
+  final MoviesDatasource datasource;
+
+  MovieRepositoryImpl(this.datasource);
+
+  @override
+  Future<List<Movie>> getNowPlaying({int page = 1}) =>
+      datasource.getNowPlaying(page: page);
+
+  @override
+  Future<List<Movie>> getPopular({int page = 1}) =>
+      datasource.getPopular(page: page);
+
+  @override
+  Future<List<Movie>> getUpcoming({int page = 1}) =>
+      datasource.getUpcoming(page: page);
+
+  @override
+  Future<List<Movie>> getTopRated({int page = 1}) =>
+      datasource.getTopRated(page: page);
+
+  @override
+  Future<List<Movie>> getMexicanMovies({int page = 1}) =>
+      datasource.getMexicanMovies(page: page);
+}
+```
+
+---
+
+## `MoviesRepository` abstract interface
+
+The domain layer defines the contract that any repository implementation must fulfil. This keeps the presentation and domain layers free of infrastructure details.
+
+```dart movies_repository.dart
+abstract class MoviesRepository {
+  Future<List<Movie>> getNowPlaying({int page = 1});
+  Future<List<Movie>> getPopular({int page = 1});
+  Future<List<Movie>> getUpcoming({int page = 1});
+  Future<List<Movie>> getTopRated({int page = 1});
+  Future<List<Movie>> getMexicanMovies({int page = 1});
+}
+```
+
+---
+
+## Reading the provider
+
+Movie-list providers watch `movieRepositoryProvider` and pull individual method references from it:
+
+```dart movies_providers.dart
+final nowPlayingMoviesProvider = NotifierProvider<MoviesNotifier, List<Movie>>(
+  () => MoviesNotifier(
+    (ref) => ref.watch(movieRepositoryProvider).getNowPlaying,
+  ),
+);
+```
+
+You can also read it directly in a widget when you need an ad-hoc call:
+
+```dart
+final repository = ref.read(movieRepositoryProvider);
+final movies = await repository.getTopRated(page: 2);
+```
+
+<Note>
+  Use `ref.read` (not `ref.watch`) when calling the repository imperatively inside callbacks or `initState`. Reserve `ref.watch` for reactive rebuilds.
+</Note>
